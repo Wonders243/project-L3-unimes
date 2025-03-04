@@ -358,8 +358,46 @@
                 }
             }
             const canvas = document.getElementById("canvas");
-                const ctx = canvas.getContext("2d");
+            const ctx = canvas.getContext("2d");
 
+                let offsetX = 0, offsetY = 0;  // Décalage de la caméra
+                let zoom = 1;  // Niveau de zoom
+                let isDragging = false;  // Détection si l'utilisateur fait glisser la souris
+
+                // Fonction pour mettre à jour la position de la caméra
+                function updateCameraPosition(event) {
+                    if (isDragging) {
+                        const dx = event.movementX;
+                        const dy = event.movementY;
+                        offsetX += dx;
+                        offsetY += dy;
+                        draw();  // Redessiner avec le nouveau décalage
+                    }
+                }
+                // Fonction pour activer/désactiver le mode de glissement de la souris
+                    canvas.addEventListener('mousedown', (event) => {
+                        isDragging = true;
+                        canvas.addEventListener('mousemove', updateCameraPosition);
+                    });
+
+                    canvas.addEventListener('mouseup', () => {
+                        isDragging = false;
+                        canvas.removeEventListener('mousemove', updateCameraPosition);
+                    });
+
+                    // Fonction de zoom avec la molette de la souris
+                    canvas.addEventListener('wheel', (event) => {
+                        const zoomFactor = 0.1;  // Facteur de zoom
+                        if (event.deltaY > 0) {
+                            zoom -= zoomFactor;  // Dézoomer
+                        } else {
+                            zoom += zoomFactor;  // Zoomer
+                        }
+                        zoom = Math.max(0.1, Math.min(zoom, 3));  // Limiter le zoom entre 0.1 et 3
+                        draw();  // Redessiner avec le nouveau niveau de zoom
+                        event.preventDefault();  // Empêcher le défilement de la page
+                    });
+                
                 function resizeCanvas() {
                     canvas.width = canvas.clientWidth;
                     canvas.height = canvas.clientHeight;
@@ -392,8 +430,13 @@
                 }
 
 
+                // Fonction de dessin avec le décalage et le zoom
                 function draw() {
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.save();
+                    ctx.translate(offsetX, offsetY);  // Applique le décalage à toute la scène
+                    ctx.scale(zoom, zoom);  // Applique le zoom à toute la scène
+
                     for (let animal of animals) {
                         ctx.fillStyle = animal.color;
                         ctx.beginPath();
@@ -401,9 +444,13 @@
                         ctx.fill();
                         drawArrow(animal.x, animal.y, animal.dx, animal.dy, "black");
                     }
+
+                    ctx.restore();
                     requestAnimationFrame(draw);
                 }
-                draw();
+
+// Appel initial pour démarrer la simulation
+draw();
         </script>
     </body>
 </html>
