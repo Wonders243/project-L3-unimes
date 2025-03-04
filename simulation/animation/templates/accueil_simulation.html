@@ -369,7 +369,9 @@
 
                 let animals = [];
 
-                const socket = new WebSocket("ws://127.0.0.1:8000/ws/animals/");
+                const socket = new WebSocket("wss://studious-guacamole-4jvp7vw5jvr4fq7jw-8000.app.github.dev/ws/animals/");
+
+
                 socket.onmessage = (event) => {
                     animals = JSON.parse(event.data);
                 };
