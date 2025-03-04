@@ -6,6 +6,45 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 
 
 class AnimalConsumer(AsyncWebsocketConsumer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Limites de la carte
+        self.map_width = 800
+        self.map_height = 600
+
+    def is_within_bounds(self, x, y):
+        return 0 <= x <= self.map_width and 0 <= y <= self.map_height
+
+    def handle_boundaries(self, animal):
+        # Rebondir contre les bords
+        if animal["x"] < 0:
+            animal["x"] = 0
+            animal["dx"] = abs(animal["dx"])  # Change la direction
+        elif animal["x"] > self.map_width:
+            animal["x"] = self.map_width
+            animal["dx"] = -abs(animal["dx"])  # Change la direction
+
+        if animal["y"] < 0:
+            animal["y"] = 0
+            animal["dy"] = abs(animal["dy"])  # Change la direction
+        elif animal["y"] > self.map_height:
+            animal["y"] = self.map_height
+            animal["dy"] = -abs(animal["dy"])  # Change la direction
+
+    async def update_animals(self):
+        while True:
+            for animal in self.animals:
+                if animal["type"] == "predator":
+                    self.update_lion(animal)
+                elif animal["type"] == "prey":
+                    self.update_gazelle(animal)
+
+                # Vérification des frontières après chaque mise à jour de position
+                self.handle_boundaries(animal)
+
+            await self.send(text_data=json.dumps(self.animals))
+            await asyncio.sleep(0.05)
+
     async def connect(self):
         await self.accept()
         print("Connexion WebSocket établie !")
