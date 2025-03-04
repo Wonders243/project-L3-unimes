@@ -9,8 +9,8 @@ class AnimalConsumer(AsyncWebsocketConsumer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Limites de la carte
-        self.map_width = 800
-        self.map_height = 600
+        self.map_width = 100
+        self.map_height = 100
 
     def is_within_bounds(self, x, y):
         return 0 <= x <= self.map_width and 0 <= y <= self.map_height
