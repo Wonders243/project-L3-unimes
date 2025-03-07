@@ -1,3 +1,4 @@
+
 import json
 import random
 import asyncio
@@ -20,23 +21,36 @@ class AnimalConsumer(AsyncWebsocketConsumer):
 
     async def update_animals(self):
         while True:
-            for animal in self.animals:
-                if animal["type"] == "predator":
-                    self.update_lion(animal)
-                elif animal["type"] == "prey":
-                    self.update_gazelle(animal)
+            for animal in self.animals[:]:
+                if animal["energy"] <= 0:
+                    self.animals.remove(animal)
+                    self.cadavres.append({"x": animal["x"], "y": animal["y"], "type": "cadavre", "energy": 50})
+                    continue
+                
+                animal["energy"] -= 0.1  # Perte d'énergie progressive
+                if animal["energy"] < 20:
+                    self.dormir(animal)
+                else:
+                    if animal["type"] == "predator":
+                        self.update_lion(animal)
+                    elif animal["type"] == "prey":
+                        self.update_gazelle(animal)
                 self.handle_boundaries(animal)
-            await self.send(text_data=json.dumps(self.animals))
+            
+            self.update_cadavres()
+            
+            await self.send(text_data=json.dumps(self.animals + self.cadavres))
             await asyncio.sleep(0.05)
 
     async def connect(self):
         await self.accept()
         self.animals = self.create_animals()
+        self.cadavres = []
         asyncio.create_task(self.update_animals())
 
     def create_animals(self):
         animals = []
-        for _ in range(3):
+        for _ in range(2):
             lion = {
                 "id": "lion",
                 "x": random.randint(100, 500),
@@ -47,6 +61,7 @@ class AnimalConsumer(AsyncWebsocketConsumer):
                 "max_speed": 12,
                 "acceleration": 1.5,
                 "vision": 200,
+                "energy": 100,
                 "color": "red",
                 "type": "predator"
             }
@@ -62,6 +77,7 @@ class AnimalConsumer(AsyncWebsocketConsumer):
                 "max_speed": 10,
                 "acceleration": 1,
                 "vision": 100,
+                "energy": 100,
                 "color": "green",
                 "type": "prey"
             }
@@ -85,11 +101,45 @@ class AnimalConsumer(AsyncWebsocketConsumer):
             if speed > lion["max_speed"]:
                 lion["dx"] *= lion["max_speed"] / speed
                 lion["dy"] *= lion["max_speed"] / speed
+            
+            if self.distance(lion, target) < 5:
+                self.manger(lion, target)
         else:
             lion["dx"] += random.uniform(-0.2, 0.2)
             lion["dy"] += random.uniform(-0.2, 0.2)
         lion["x"] += lion["dx"]
         lion["y"] += lion["dy"]
+
+    def update_cadavres(self):
+        for lion in [a for a in self.animals if a["type"] == "predator"]:
+            cadavres_proches = [c for c in self.cadavres if self.distance(lion, c) < lion["vision"]]
+            if cadavres_proches:
+                target = min(cadavres_proches, key=lambda c: self.distance(lion, c))
+                angle = self.angle_between(lion, target)
+                lion["dx"] += math.cos(angle) * 0.5
+                lion["dy"] += math.sin(angle) * 0.5
+                if self.distance(lion, target) < 5:
+                    self.manger_cadavre(lion, target)
+    
+    def manger(self, predator, prey):
+        if prey in self.animals:
+            self.animals.remove(prey)
+            self.cadavres.append({"x": prey["x"], "y": prey["y"], "type": "cadavre", "energy": 50})
+            predator["energy"] += 30
+            if predator["energy"] > 100:
+                predator["energy"] = 100
+    
+    def manger_cadavre(self, predator, cadavre):
+        cadavre["energy"] -= 2
+        predator["energy"] += 2
+        if cadavre["energy"] <= 0:
+            self.cadavres.remove(cadavre)
+    def dormir(self, animal):
+        animal["dx"] = 0
+        animal["dy"] = 0
+        animal["energy"] += 0.5  # Recharge lente de l'énergie
+        if animal["energy"] > 100:
+            animal["energy"] = 100
 
     def update_gazelle(self, gazelle):
         predators_nearby = [lion for lion in self.animals if lion["type"] == "predator" and self.distance(gazelle, lion) <= gazelle["vision"]]
