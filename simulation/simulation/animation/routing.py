@@ -1,6 +1,6 @@
-from django.urls import path
-from .consumers import AnimalConsumer
+from django.urls import re_path
+from animation import consumers  # Assurez-vous d'avoir un consumer WebSocket configuré
 
 websocket_urlpatterns = [
-    path("ws/animals/", AnimalConsumer.as_asgi()),
+    re_path(r'ws/animals/', consumers.AnimalConsumer.as_asgi()),  # Le chemin de votre WebSocket
 ]

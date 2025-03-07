@@ -6,6 +6,45 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 
 
 class AnimalConsumer(AsyncWebsocketConsumer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Limites de la carte
+        self.map_width = 600
+        self.map_height = 800
+
+    def is_within_bounds(self, x, y):
+        return 0 <= x <= self.map_width and 0 <= y <= self.map_height
+
+    def handle_boundaries(self, animal):
+        # Rebondir contre les bords
+        if animal["x"] < 0:
+            animal["x"] = 0
+            animal["dx"] = abs(animal["dx"])  # Change la direction
+        elif animal["x"] > self.map_width:
+            animal["x"] = self.map_width
+            animal["dx"] = -abs(animal["dx"])  # Change la direction
+
+        if animal["y"] < 0:
+            animal["y"] = 0
+            animal["dy"] = abs(animal["dy"])  # Change la direction
+        elif animal["y"] > self.map_height:
+            animal["y"] = self.map_height
+            animal["dy"] = -abs(animal["dy"])  # Change la direction
+
+    async def update_animals(self):
+        while True:
+            for animal in self.animals:
+                if animal["type"] == "predator":
+                    self.update_lion(animal)
+                elif animal["type"] == "prey":
+                    self.update_gazelle(animal)
+
+                # Vérification des frontières après chaque mise à jour de position
+                self.handle_boundaries(animal)
+
+            await self.send(text_data=json.dumps(self.animals))
+            await asyncio.sleep(0.05)
+
     async def connect(self):
         await self.accept()
         print("Connexion WebSocket établie !")
@@ -24,7 +63,7 @@ class AnimalConsumer(AsyncWebsocketConsumer):
                 "y": random.randint(100, 500),
                 "dx": random.uniform(-1, 1),
                 "dy": random.uniform(-1, 1),
-                "speed": 2,
+                "speed": 1,
                 "max_speed": 20,
                 "acceleration": 5,
                 "braking": 3,
@@ -44,7 +83,7 @@ class AnimalConsumer(AsyncWebsocketConsumer):
                 "y": random.randint(100, 500),
                 "dx": random.uniform(-1, 1),
                 "dy": random.uniform(-1, 1),
-                "speed": 2,
+                "speed": 1,
                 "max_speed": 15,
                 "acceleration": 7,
                 "braking": 6,
@@ -58,16 +97,6 @@ class AnimalConsumer(AsyncWebsocketConsumer):
 
         return animals
 
-    async def update_animals(self):
-        while True:
-            for animal in self.animals:
-                if animal["type"] == "predator":
-                    self.update_lion(animal)
-                elif animal["type"] == "prey":
-                    self.update_gazelle(animal)
-
-            await self.send(text_data=json.dumps(self.animals))
-            await asyncio.sleep(0.05)
 
     def distance(self, a, b):
         return math.sqrt((a["x"] - b["x"]) ** 2 + (a["y"] - b["y"]) ** 2)
@@ -85,7 +114,7 @@ class AnimalConsumer(AsyncWebsocketConsumer):
             angle_diff = 2 * math.pi - angle_diff
 
         distance_to_b = self.distance(a, b)
-        return distance_to_b <= a["vision"] and angle_diff <= a["view_angle"] / 2
+        return distance_to_b <= a["vision"] and angle_diff <= a["view_angle"] 
 
     def update_lion(self, lion):
         # Recherche des proies (gazelles)
@@ -107,15 +136,15 @@ class AnimalConsumer(AsyncWebsocketConsumer):
             dy = nearest_prey["y"] - lion["y"]
             dist = math.sqrt(dx ** 2 + dy ** 2)
 
-            if dist > 2:
+            if dist < 2:
                 # Accélération vers la gazelle
                 lion["dx"] += (dx / dist) * lion["acceleration"]
                 lion["dy"] += (dy / dist) * lion["acceleration"]
 
             # Empêche le lion de devenir immobile en dessous d'une certaine vitesse
             speed = math.sqrt(lion["dx"] ** 2 + lion["dy"] ** 2)
-            if speed < 0.1:  # Vitesse minimale pour que le lion continue à bouger
-                lion["dx"] = lion["dy"] = 0  # Empêche d'aller à zéro
+            if speed > 2:  # Vitesse minimale pour que le lion continue à bouger
+                lion["dx"] = lion["dy"] = 1  # Empêche d'aller à zéro
             elif speed > lion["max_speed"]:
                 lion["dx"] *= lion["max_speed"] / speed
                 lion["dy"] *= lion["max_speed"] / speed
