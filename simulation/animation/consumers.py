@@ -5,12 +5,14 @@ import asyncio
 import math
 from channels.generic.websocket import AsyncWebsocketConsumer
 
+# Charger le modèle complet
+model = load_model('mon_modele_lstm.h5')
+
 class AnimalConsumer(AsyncWebsocketConsumer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.map_width = 600
         self.map_height = 800
-
     def handle_boundaries(self, animal):
         if animal["x"] < 0 or animal["x"] > self.map_width:
             animal["dx"] *= -1
