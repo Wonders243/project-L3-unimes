@@ -8,7 +8,8 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 
 class Simulation (AsyncWebsocketConsumer):
 
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.largeur = largeur  # Largeur du canvas en pixels
         self.hauteur = hauteur  # Hauteur du canvas en pixels
         self.annee = 1
