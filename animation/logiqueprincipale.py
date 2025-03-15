@@ -1,7 +1,12 @@
 import time
+import random
+import math
+
 
 class Simulation:
     def __init__(self):
+        self.largeur = largeur  # Largeur du canvas en pixels
+        self.hauteur = hauteur  # Hauteur du canvas en pixels
         self.annee = 1
         self.mois = 1
         self.jour = 1
@@ -52,6 +57,25 @@ class Simulation:
 
         # Affichage formaté
         print(f"{self.annee}/{self.mois}/{self.jour} - {self.heure:02}:{self.minute:02}:{self.seconde:02} [{cycle}]")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     def demarrer(self):
         """Démarre la simulation avec un passage du temps automatique."""
