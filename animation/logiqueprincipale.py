@@ -78,12 +78,20 @@ class Simulation (AsyncWebsocketConsumer):
 
 
 class Animal:
-    def __init__(self, nom, x, y):
+    def __init__(self, nom, x, y, age, poids, energie, faim, soif):
         self.nom = nom
-        self.x = x
+        self.x = x  # Position en pixels
         self.y = y
-        self.vitesse = 5  # Pixels par tick
-        self.vision = 50  # Rayon de vision en pixels
+        self.age = age
+        self.poids = poids
+        self.energie = energie  # (0-100)
+        self.faim = faim  # (0-100)
+        self.soif = soif  # (0-100)
+        self.nourriture_dispo = 0  # Nourriture proche
+        self.eau_proche = 0  # 1 si eau proche, 0 sinon
+        self.predateurs = 0
+        self.proies = 0
+      
 
     def distance(self, autre):
         """Calcule la distance entre cet animal et un autre."""
