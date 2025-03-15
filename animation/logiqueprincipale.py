@@ -75,10 +75,17 @@ class Simulation (AsyncWebsocketConsumer):
 
 
 
+  
 
 
 
 
+
+        async def connect(self):
+        await self.accept()
+        self.animals = self.create_animals()
+        self.cadavres = []
+        asyncio.create_task(self.update_animals())
 
 
 
