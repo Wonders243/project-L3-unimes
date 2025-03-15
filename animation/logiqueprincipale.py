@@ -4,8 +4,10 @@ import math
 import json
 import random
 import asyncio
+from channels.generic.websocket import AsyncWebsocketConsumer
 
-class Simulation:
+class Simulation (AsyncWebsocketConsumer):
+
     def __init__(self):
         self.largeur = largeur  # Largeur du canvas en pixels
         self.hauteur = hauteur  # Hauteur du canvas en pixels
