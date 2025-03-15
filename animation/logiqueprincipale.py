@@ -81,15 +81,15 @@ class Simulation (AsyncWebsocketConsumer):
 
 
 
-        async def connect(self):
+async def connect(self):
         await self.accept()
         self.animals = self.create_animals()
         self.cadavres = []
-        asyncio.create_task(self.update_animals())
+        asyncio.create_task(self.demarrer())
 
 
 
-    def demarrer(self):
+async def demarrer(self):
         """Démarre la simulation avec un passage du temps automatique."""
         while True:
             self.avancer_temps()
