@@ -1,48 +1,31 @@
-
 import json
 import random
 import asyncio
 import math
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.models import load_model
+
+import pickle
+import numpy as np
+import pandas as pd
+import keras
 from channels.generic.websocket import AsyncWebsocketConsumer
 
-# Charger le modèle complet
-model = load_model('mon_modele_lstm.h5')
+# 🔥 Chargement du modèle local
+MODEL_PATH = "/workspaces/project-L3-unimes/animal_decision_model.h5"
+SCALER_PATH = "/workspaces/project-L3-unimes/scaler.pkl"
+ENCODER_ANIMAL_PATH = "/workspaces/project-L3-unimes/encoder_animal.pkl"
+ENCODER_CLIMAT_PATH = "/workspaces/project-L3-unimes/encoder_climat.pkl"
+ENCODER_DECISION_PATH = "/workspaces/project-L3-unimes/encoder_decision.pkl"
+
+model = load_model(MODEL_PATH)
 
 class AnimalConsumer(AsyncWebsocketConsumer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.map_width = 600
         self.map_height = 800
-    def handle_boundaries(self, animal):
-        if animal["x"] < 0 or animal["x"] > self.map_width:
-            animal["dx"] *= -1
-        if animal["y"] < 0 or animal["y"] > self.map_height:
-            animal["dy"] *= -1
-        animal["x"] = max(0, min(self.map_width, animal["x"]))
-        animal["y"] = max(0, min(self.map_height, animal["y"]))
-
-    async def update_animals(self):
-        while True:
-            for animal in self.animals[:]:
-                if animal["energy"] <= 0:
-                    self.animals.remove(animal)
-                    self.cadavres.append({"x": animal["x"], "y": animal["y"], "type": "cadavre", "energy": 50})
-                    continue
-                
-                animal["energy"] -= 0.1  # Perte d'énergie progressive
-                if animal["energy"] < 20:
-                    self.dormir(animal)
-                else:
-                    if animal["type"] == "predator":
-                        self.update_lion(animal)
-                    elif animal["type"] == "prey":
-                        self.update_gazelle(animal)
-                self.handle_boundaries(animal)
-            
-            self.update_cadavres()
-            
-            await self.send(text_data=json.dumps(self.animals + self.cadavres))
-            await asyncio.sleep(0.05)
 
     async def connect(self):
         await self.accept()
@@ -64,10 +47,20 @@ class AnimalConsumer(AsyncWebsocketConsumer):
                 "acceleration": 1.5,
                 "vision": 200,
                 "energy": 100,
+                "faim": random.randint(0, 100),
+                "soif": random.randint(0, 100),
+                "temperature": random.randint(-10, 40),
+                "climat": random.choice(["pluie", "soleil", "neige", "vent"]),
+                "predateurs": 0,
+                "proies": random.randint(0, 5),
+                "heure": random.randint(0, 23),
+                "age": random.randint(2, 15),
+                "poids": random.randint(120, 250),
                 "color": "red",
                 "type": "predator"
             }
             animals.append(lion)
+
         for _ in range(1):
             gazelle = {
                 "id": "gazelle",
@@ -80,37 +73,131 @@ class AnimalConsumer(AsyncWebsocketConsumer):
                 "acceleration": 1,
                 "vision": 100,
                 "energy": 100,
+                "faim": random.randint(0, 100),
+                "soif": random.randint(0, 100),
+                "temperature": random.randint(-10, 40),
+                "climat": random.choice(["pluie", "soleil", "neige", "vent"]),
+                "predateurs": random.randint(0, 2),
+                "proies": random.randint(0, 5),
+                "heure": random.randint(0, 23),
+                "age": random.randint(1, 10),
+                "poids": random.randint(30, 70),
                 "color": "green",
                 "type": "prey"
             }
             animals.append(gazelle)
+
         return animals
 
-    def distance(self, a, b):
-        return math.sqrt((a["x"] - b["x"]) ** 2 + (a["y"] - b["y"]) ** 2)
+    async def update_animals(self):
+        while True:
+            for animal in self.animals[:]:
+                if animal["energy"] <= 0:
+                    self.animals.remove(animal)
+                    self.cadavres.append({"x": animal["x"], "y": animal["y"], "type": "cadavre", "energy": 50})
+                    continue
+                
+                prediction = self.predict_behavior(animal)  # 🔥 Prédiction avec le modèle
+                self.apply_prediction(animal, prediction)  # 🔥 Application des prédictions
+                
+                self.handle_boundaries(animal)
 
-    def angle_between(self, a, b):
-        return math.atan2(b["y"] - a["y"], b["x"] - a["x"])
-
-    def update_lion(self, lion):
-        prey_in_sight = [gazelle for gazelle in self.animals if gazelle["type"] == "prey" and self.distance(lion, gazelle) <= lion["vision"]]
-        if prey_in_sight:
-            target = min(prey_in_sight, key=lambda gazelle: self.distance(lion, gazelle))
-            angle = self.angle_between(lion, target)
-            lion["dx"] += math.cos(angle) * lion["acceleration"]
-            lion["dy"] += math.sin(angle) * lion["acceleration"]
-            speed = math.sqrt(lion["dx"]**2 + lion["dy"]**2)
-            if speed > lion["max_speed"]:
-                lion["dx"] *= lion["max_speed"] / speed
-                lion["dy"] *= lion["max_speed"] / speed
+            self.update_cadavres()
             
-            if self.distance(lion, target) < 5:
-                self.manger(lion, target)
-        else:
-            lion["dx"] += random.uniform(-0.2, 0.2)
-            lion["dy"] += random.uniform(-0.2, 0.2)
-        lion["x"] += lion["dx"]
-        lion["y"] += lion["dy"]
+            await self.send(text_data=json.dumps(self.animals + self.cadavres))
+            await asyncio.sleep(0.05)
+
+   
+
+# Charger le scaler et les encodeurs
+with open(SCALER_PATH, 'rb') as f:
+    scaler = pickle.load(f)
+with open(ENCODER_ANIMAL_PATH, 'rb') as f:
+    encoder_animal = pickle.load(f)
+with open(ENCODER_CLIMAT_PATH, 'rb') as f:
+    encoder_climat = pickle.load(f)
+with open(ENCODER_DECISION_PATH, 'rb') as f:
+    encoder_decision = pickle.load(f)
+
+def predict_behavior(animal):
+    """ Prédit le comportement d'un animal en utilisant le modèle """
+    try:
+        # Transformer les données en DataFrame
+        data = pd.DataFrame([[
+            animal["nom"],  # Nom de l'animal
+            animal["age"],
+            animal["poids"],
+            animal["energie"],
+            animal["faim"],
+            animal["soif"],
+            animal["nourriture"],
+            animal["eau"],
+            animal["temperature"],
+            animal["climat"],
+            animal["predateurs"],
+            animal["proies"],
+            animal["heure"]
+        ]], columns=[
+            "animal", "age", "poids", "energie", "faim", "soif", 
+            "nourriture", "eau", "temperature", "climat", 
+            "predateurs", "proies", "heure"
+        ])
+
+        # Encodage des variables catégoriques
+        data["animal"] = encoder_animal.transform(data["animal"])
+        data["climat"] = encoder_climat.transform(data["climat"])
+
+        # Normalisation des données
+        data = scaler.transform(data)
+
+        # Reshape pour modèle LSTM
+        data = data.reshape((data.shape[0], 1, data.shape[1]))
+
+        # Prédictions
+        prediction = model.predict(data)
+        action = encoder_decision.inverse_transform([np.argmax(prediction)])
+
+        return {"action": action[0]}  # Retourner l'action prédite
+
+    except Exception as e:
+        print(f"Erreur lors de la prédiction : {e}")
+        return {"action": "rien"}  # Si erreur, retourner "rien"
+    
+    def apply_prediction(self, animal, prediction):
+        """ Applique les actions prédites par le modèle. """
+        action = prediction.get("action", "rien")
+
+        if action == "manger":
+            if animal["type"] == "predator":
+                self.update_lion(animal)
+            elif animal["type"] == "prey":
+                animal["dx"] += random.uniform(-0.5, 0.5)
+                animal["dy"] += random.uniform(-0.5, 0.5)
+
+        elif action == "fuir":
+            if animal["type"] == "prey":
+                self.update_gazelle(animal)
+
+        elif action == "dormir":
+            self.dormir(animal)
+
+        animal["x"] += animal["dx"]
+        animal["y"] += animal["dy"]
+
+    def dormir(self, animal):
+        animal["dx"] = 0
+        animal["dy"] = 0
+        animal["energy"] += 0.5
+        if animal["energy"] > 100:
+            animal["energy"] = 100
+
+    def handle_boundaries(self, animal):
+        if animal["x"] < 0 or animal["x"] > self.map_width:
+            animal["dx"] *= -1
+        if animal["y"] < 0 or animal["y"] > self.map_height:
+            animal["dy"] *= -1
+        animal["x"] = max(0, min(self.map_width, animal["x"]))
+        animal["y"] = max(0, min(self.map_height, animal["y"]))
 
     def update_cadavres(self):
         for lion in [a for a in self.animals if a["type"] == "predator"]:
@@ -122,37 +209,10 @@ class AnimalConsumer(AsyncWebsocketConsumer):
                 lion["dy"] += math.sin(angle) * 0.5
                 if self.distance(lion, target) < 5:
                     self.manger_cadavre(lion, target)
-    
-    def manger(self, predator, prey):
-        if prey in self.animals:
-            self.animals.remove(prey)
-            self.cadavres.append({"x": prey["x"], "y": prey["y"], "type": "cadavre", "energy": 50})
-            predator["energy"] += 30
-            if predator["energy"] > 100:
-                predator["energy"] = 100
-    
+
     def manger_cadavre(self, predator, cadavre):
         cadavre["energy"] -= 2
         predator["energy"] += 2
         if cadavre["energy"] <= 0:
             self.cadavres.remove(cadavre)
-    def dormir(self, animal):
-        animal["dx"] = 0
-        animal["dy"] = 0
-        animal["energy"] += 0.5  # Recharge lente de l'énergie
-        if animal["energy"] > 100:
-            animal["energy"] = 100
 
-    def update_gazelle(self, gazelle):
-        predators_nearby = [lion for lion in self.animals if lion["type"] == "predator" and self.distance(gazelle, lion) <= gazelle["vision"]]
-        if predators_nearby:
-            danger = min(predators_nearby, key=lambda lion: self.distance(gazelle, lion))
-            angle = self.angle_between(gazelle, danger) + math.pi
-            gazelle["dx"] += math.cos(angle) * gazelle["acceleration"]
-            gazelle["dy"] += math.sin(angle) * gazelle["acceleration"]
-            speed = math.sqrt(gazelle["dx"]**2 + gazelle["dy"]**2)
-            if speed > gazelle["max_speed"]:
-                gazelle["dx"] *= gazelle["max_speed"] / speed
-                gazelle["dy"] *= gazelle["max_speed"] / speed
-        gazelle["x"] += gazelle["dx"]
-        gazelle["y"] += gazelle["dy"]

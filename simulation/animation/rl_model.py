@@ -1,3 +1,4 @@
+# train_model.py
 import pandas as pd
 import numpy as np
 import random
@@ -5,20 +6,18 @@ import tensorflow as tf
 from tensorflow import keras
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
-# Nouvelle logique améliorée pour l'attribution des décisions
+# Définition de la fonction de décision
 def determine_decision(animal, faim, soif, energie, nourriture, eau, predateurs, proies, temperature, temps):
-    # Probabilité d'activité nocturne pour certains animaux
-    chasse_nuit_prob = 0.3 if animal in ["lion", "loup"] else 0.1  # Prédateurs plus actifs la nuit
+    chasse_nuit_prob = 0.3 if animal in ["lion", "loup"] else 0.1
 
     if temps == "nuit":
         if energie < 30 and random.random() > chasse_nuit_prob:
-            return "dormir"  # La plupart des animaux dorment
+            return "dormir"
         elif faim > 80 and proies > 0 and random.random() < chasse_nuit_prob:
-            return "chasser"  # Un prédateur affamé peut chasser malgré la nuit
+            return "chasser"
         else:
             return "se reposer"
 
-    # Logique de jour (matin / après-midi)
     if faim > 80 and proies > 0:
         return "chasser"
     elif faim > 80 and nourriture > 5:
@@ -42,26 +41,26 @@ def determine_decision(animal, faim, soif, energie, nourriture, eau, predateurs,
     else:
         return "explorer"
 
+# Génération de données d'animaux
 def generate_animal_data(n_samples=1000):
     data = []
     
     for _ in range(n_samples):
         animal = random.choice(["lion", "gazelle", "loup", "lapin", "ours"])
-        age = random.randint(0, 15)  # En années
-        poids = random.randint(5, 250)  # En kg
+        age = random.randint(0, 15)
+        poids = random.randint(5, 250)
         energie = random.randint(0, 100)
         faim = random.randint(0, 100)
         soif = random.randint(0, 100)
-        nourriture = random.randint(0, 50)  # Quantité dispo
-        eau = random.choice([0, 1])  # 1 si point d'eau proche
+        nourriture = random.randint(0, 50)
+        eau = random.choice([0, 1])
         temperature = random.randint(-10, 40)
         climat = random.choice(["pluie", "soleil", "neige", "vent"])
-        predateurs = random.randint(0, 2)  # Nombre de prédateurs proches
-        proies = random.randint(0, 5)  # Nombre de proies proches
-        temps = random.randint(0, 23)  # Heure de la journée
+        predateurs = random.randint(0, 2)
+        proies = random.randint(0, 5)
+        temps = random.randint(0, 23)
         
         decision = determine_decision(animal, faim, soif, energie, nourriture, eau, predateurs, proies, temperature, temps)
- 
         data.append([animal, age, poids, energie, faim, soif, nourriture, eau, temperature, climat, predateurs, proies, temps, decision])
     
     columns = ["animal", "age", "poids", "energie", "faim", "soif", "nourriture", "eau", "temperature", "climat", "predateurs", "proies", "heure", "decision"]
@@ -69,10 +68,10 @@ def generate_animal_data(n_samples=1000):
     
     return df
 
-# Générer les données
-df = generate_animal_data(1000000)
+# Génération des données
+df = generate_animal_data(100000)
 
-# Encodage des variables catégoriques
+# Encodage des variables
 encoder_animal = LabelEncoder()
 df["animal"] = encoder_animal.fit_transform(df["animal"])
 
@@ -107,35 +106,22 @@ model.compile(loss='sparse_categorical_crossentropy', optimizer='adam', metrics=
 # Entraînement du modèle
 model.fit(X, y, epochs=10, batch_size=32, validation_split=0.2)
 
-# Sauvegarde du modèle
-model.save("animal_decision_model.h5")
+# Sauvegarde du modèle et des encodeurs
+model.save("animal_decision_model1.h5")
+scaler_filename = "scaler.pkl"
+encoder_animal_filename = "encoder_animal.pkl"
+encoder_climat_filename = "encoder_climat.pkl"
+encoder_decision_filename = "encoder_decision.pkl"
 
-# Tester le modèle avec 3 animaux
-test_animals = pd.DataFrame([
-    ["lion", 10, 200, 30, 80, 50, 10, 1, 30, "soleil", 1, 3, 14],
-    ["gazelle", 3, 50, 90, 20, 40, 30, 1, 25, "pluie", 0, 2, 8],
-    ["ours", 8, 180, 20, 50, 90, 5, 0, -5, "neige", 2, 1, 23]
-], columns=["animal", "age", "poids", "energie", "faim", "soif", "nourriture", "eau", "temperature", "climat", "predateurs", "proies", "heure"])
+# Sauvegarder les encodeurs
+import pickle
+with open(scaler_filename, 'wb') as f:
+    pickle.dump(scaler, f)
+with open(encoder_animal_filename, 'wb') as f:
+    pickle.dump(encoder_animal, f)
+with open(encoder_climat_filename, 'wb') as f:
+    pickle.dump(encoder_climat, f)
+with open(encoder_decision_filename, 'wb') as f:
+    pickle.dump(encoder_decision, f)
 
-# Encodage et normalisation
-test_animals["animal"] = encoder_animal.transform(test_animals["animal"])
-test_animals["climat"] = encoder_climat.transform(test_animals["climat"])
-test_animals = scaler.transform(test_animals)
-test_animals = test_animals.reshape((test_animals.shape[0], 1, test_animals.shape[1]))
-
-# Charger le modèle et faire les prédictions
-model = keras.models.load_model("animal_decision_model.h5")
-predictions = model.predict(test_animals)
-predicted_decisions = encoder_decision.inverse_transform(np.argmax(predictions, axis=1))
-
-# Affichage des résultats
-for i, animal in enumerate(["lion", "gazelle", "ours"]):
-    print(f"{animal} dans ces conditions choisit de : {predicted_decisions[i]}")
-
-# Évaluation
-loss, accuracy = model.evaluate(X, y)
-print(f"Précision du modèle: {accuracy:.2f}")
-
-# Télécharger le fichier CSV
-df.to_csv("animal_data.csv", index=False)
-files.download("animal_data.csv")
+print("Modèle et encodeurs sauvegardés.")
