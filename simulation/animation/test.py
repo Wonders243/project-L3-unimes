@@ -38,10 +38,12 @@ def test_animal_model(model_path, scaler_path, encoder_animal_path, encoder_clim
 
 # Exemple de données à tester
 test_animals = pd.DataFrame([
-    ["lion", 10, 200, 30, 80, 50, 10, 1, 30, "neige", 1, 3, 14],
-    ["gazelle", 3, 50, 90, 20, 40, 30, 1, 25, "pluie", 0, 2, 8],
-    ["ours", 29, 180, 0, 50, 5, 5, 1, -5, "neige", 2, 1, 50]
+    ["lion", 10, 200, 30, 80, 50, 10, 1, 30, "pluie", 1, 3, 14],
+    ["gazelle", 50, 80, 90, 80, 90, 30, 0, 25, "pluie", 0, 2, 8],
+    ["ours", 29, 180, 50, 40, 10, 1, 0, 0, "pluie", 2, 1, 2],
+    ["lapin", 10, 200, 30, 80, 50, 10, 1, 30, "pluie", 1, 3, 14],
 ], 
+
 columns=["animal", "age", "poids", "energie", "faim", "soif", "nourriture", "eau", "temperature", "climat", "predateurs", "proies", "heure"])
 
 # Chemins vers les fichiers sauvegardés

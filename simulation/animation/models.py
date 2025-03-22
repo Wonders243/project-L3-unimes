@@ -5,3 +5,4 @@ from django.db import models
 class Point(models.Model):
     x = models.IntegerField()
     y = models.IntegerField()
+

@@ -33,7 +33,7 @@ def determine_decision(animal, faim, soif, energie, nourriture, eau, predateurs,
     elif predateurs > 0 and energie > 50:
         return "se regrouper"
     elif temperature < -5 or temperature > 35:
-        return "migrer"
+        return "dormir"
     elif energie < 20:
         return "se reposer"
     elif faim < 30 and soif < 30 and energie > 60:
