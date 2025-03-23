@@ -26,7 +26,6 @@ urlpatterns = [
     path('', views.accueil, name='accueil'),
     path('inscription/', views.signup, name='inscription'),
     path('connexion/', views.connexion, name='connexion'),
-    
     path('deconnexion/', views.deconnexion, name='deconnexion'),
     path('accueil_simulation/',accueil_simulation , name='accueil_simulation'),
     path('simulation/',views2.index, name='animation'),

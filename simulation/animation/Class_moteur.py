@@ -1,23 +1,25 @@
 import time
 import random
+import json
 import math
 import random
 import asyncio
+from channels.generic.websocket import AsyncWebsocketConsumer
+
 # predict_animal_decision.py
 import pandas as pd
 import numpy as np
 from tensorflow import keras
 import pickle
-import cProfile
-from channels.generic.websocket import AsyncWebsocketConsumer
+
 
 
 # Chemins vers les fichiers sauvegardés
-model_path = "animal_decision_model.h5"
-scaler_path = "scaler.pkl"
-encoder_animal_path = "encoder_animal.pkl"
-encoder_climat_path = "encoder_climat.pkl"
-encoder_decision_path = "encoder_decision.pkl"
+model_path = "/workspaces/project-L3-unimes/animal_decision_model.h5"
+scaler_path = "/workspaces/project-L3-unimes/scaler.pkl"
+encoder_animal_path = "/workspaces/project-L3-unimes/encoder_animal.pkl"
+encoder_climat_path = "/workspaces/project-L3-unimes/encoder_climat.pkl"
+encoder_decision_path = "/workspaces/project-L3-unimes/encoder_decision.pkl"
 
 # Charger le modèle
 model = keras.models.load_model(model_path)
@@ -170,19 +172,41 @@ class Simulation (AsyncWebsocketConsumer):
 
     async def connect(self):
         await self.accept()
-        self.animals = self.create_animals()
-        self.cadavres = []
         asyncio.create_task(self.demarrer())
+    async def disconnect(self, close_code):
+        print(f"Déconnexion WebSocket, code : {close_code}")
+        self.running = False  # Si tu utilises une boucle, ça permet de l’arrêter proprement
+    async def envoyer_donnees(self):
+        """
+        Envoie l'état actuel de la simulation au client WebSocket.
+        """
+        donnees = self.recuperer_donnees_animaux()  # Récupère les données en DataFrame
+        
+        # Convertir les données du DataFrame en JSON lisible
+        donnees_liste = donnees.to_dict(orient="records")
+
+        message = {
+            "annee": self.annee,
+            "mois": self.mois,
+            "jour": self.jour,
+            "heure": self.heure,
+            "minute": self.minute,
+            "seconde": self.seconde,
+            "temperature": self.temperature,
+            "climat": self.climat,
+            "animaux": donnees_liste,
+        }
+        await self.send(text_data=json.dumps(message))  # Envoi des données JSON au frontend
 
     async def demarrer(self):
-        
+       
         while True:
             self.avancer_temps()
-
             donnees=self.recuperer_donnees_animaux()
-           
             actions= self.animal_Action(donnees)
             print(actions)
+            
+            await self.envoyer_donnees()
             time.sleep(self.tick_duree)  # Pause de 50ms entre chaque tick
      
     
@@ -340,7 +364,3 @@ class Animal:
     def explorer():
         return
     
-
-# Exemple d'utilisation
-sim = Simulation(800, 600)  # Canvas de 800x600 pixels
-asyncio.run(sim.demarrer())
